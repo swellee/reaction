@@ -1,4 +1,4 @@
-import { connect } from 'react-redux';
+import { connect, Provider as RdProvider } from 'react-redux';
 import { createStore, Store } from 'redux';
 
 // defines -------------------------------------------------------------
@@ -65,7 +65,7 @@ const js_meta_types = [
 ]
 const _initStore = {};
 interface ReactionDb {
-    store: Store;
+store: Store;
     showLoading: (loadingTag?: string) => void;
     hideLoading: (loadingTag?: string) => void;
 }
@@ -107,24 +107,23 @@ interface ActionNode<P = KV> {
 
 const actionQueue: ActionNode<any>[] = [];
 /**
- * 执行一个action
- * @param moduleAction action实例
- * @param payload kv类型的数据，会传给action.process方法； 特别的，如果payload有module属性，则action实例会被克隆一份，并将module设置成payload的module
- * @param loading 是否需要标记加载，非‘none'值时，会将common module的loadingTag属性标记一下，等该action完事后再自动标记回'none'
+ * execute an action
+ *  specially ,if the first param was given a moduleName string, meanwile the payload is k-v data, 
+ * the freamework will simply merge the payload to the moduleStore of the moduleName
+ * @param moduleAction action instance or moduleName
+ * @param payload this data will be passed to action's process method，typically , it's a k-v data, eg: {a: 1, b: 'xx'}. if you give a simple metadata type (such as string, number, boolean...), the moduleAction must has a process method to deal with it
+ * @param loading whether call showloading when execute this action
  */
 export function doAction<P = KV>(
-    moduleAction: ModuleAction,
+    moduleAction: ModuleAction | string,
     payload?: P,
     loadingTag: string | 'none' = 'none'
 ) {
-    // 如果payload有module属性，则action实例会被克隆一份，并将module设置成payload的module
-    let mAction = moduleAction;
-    if (payload && typeof payload === 'object' && payload.hasOwnProperty('module')) {
-        // tslint:disable-next-line
-        mAction = { ...moduleAction, module: payload['module'] };
-    }
+    let mAction: ModuleAction = typeof moduleAction === 'string' ? 
+    {module: moduleAction} : moduleAction;
+
     // rules: payload must be a KV type when there's no process function in given moduleAction
-    if (!moduleAction.process && typeof payload in js_meta_types) {
+    if (!mAction.process && typeof payload in js_meta_types) {
         throw new Error(`
         payload must be a KV type when there's no process function in given moduleAction!
         when call 'doAction',
@@ -143,11 +142,13 @@ export function doAction<P = KV>(
                 name: `@@begin loading:${mAction.name}`,
                 module: MODULE_COMMON,
                 process: async () => {
+                    // call showLoading
                     reaction.showLoading();
-                    return null;
+                    // set the loadingTag of common module
+                    return {loadingTag};
                 }
             },
-            payload: { loadingTag }
+            payload: undefined
         });
     }
     actionQueue.push({ action: mAction, payload });
@@ -158,11 +159,13 @@ export function doAction<P = KV>(
                 name: `@@end loading:${mAction.name}`,
                 module: MODULE_COMMON,
                 process: async () => {
+                    // call hideLoading
                     reaction.hideLoading();
-                    return null;
+                    // reset the loadingTag of common module
+                    return { loadingTag: 'none' };
                 }
             },
-            payload: { loadingTag: 'none' }
+            payload: undefined
         });
         canStartAction = 3;
     }
@@ -243,7 +246,7 @@ export function mapProp(moduleStore: ModuleStore, ...props: string[]): Function 
                     props.forEach(key => {
                         if (mdStore) {
                             let uiKey, mdKey;
-                            if (key.includes(':')) {
+                                if (key.includes(':')) {
                                 const kv = key.split(':');
                                 uiKey = kv[0];
                                 mdKey = kv[1];
@@ -297,3 +300,5 @@ export function getModuleProp(moduleName: string, propName: string): any {
     const mdStore = getModuleState(moduleName);
     return mdStore ? mdStore[propName] : null;
 }
+
+export const Provider = props => RdProvider({...props, store: reaction.store})
