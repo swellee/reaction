@@ -55,6 +55,8 @@ const sassModuleRegex = /\.module\.(scss|sass)$/;
 module.exports = function(webpackEnv) {
   const isEnvDevelopment = webpackEnv === 'development';
   const isEnvProduction = webpackEnv === 'production';
+  const appIndexJs = isEnvProduction ? paths.appLibJs : paths.appDevJs;
+  const appTsConfig = isEnvProduction ? paths.appTsConfigProd : paths.appTsConfig
 
   // Webpack uses `publicPath` to determine where the app is being served from.
   // It requires a trailing slash, or the file assets will get an incorrect path.
@@ -157,7 +159,7 @@ module.exports = function(webpackEnv) {
       isEnvDevelopment &&
         require.resolve('react-dev-utils/webpackHotDevClient'),
       // Finally, this is your app's code:
-      paths.appIndexJs,
+      appIndexJs,
       // We include the app code last so that if there is a runtime error during
       // initialization, it doesn't blow up the WebpackDevServer client, and
       // changing JS code would still trigger a refresh.
@@ -170,7 +172,7 @@ module.exports = function(webpackEnv) {
       // There will be one main bundle, and one file per asynchronous chunk.
       // In development, it does not produce real files.
       filename: isEnvProduction
-        ? 'static/js/[name].[contenthash:8].js'
+        ? 'index.js'
         : isEnvDevelopment && 'static/js/bundle.js',
       // TODO: remove this when upgrading to webpack 5
       futureEmitAssets: true,
@@ -617,7 +619,7 @@ module.exports = function(webpackEnv) {
           resolveTypeReferenceDirectiveModule: process.versions.pnp
             ? `${__dirname}/pnpTs.js`
             : undefined,
-          tsconfig: paths.appTsConfig,
+          tsconfig: appTsConfig,
           reportFiles: [
             '**',
             '!**/__tests__/**',

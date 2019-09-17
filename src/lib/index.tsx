@@ -1,13 +1,13 @@
+import React from 'react';
 import { connect, Provider as RdProvider } from 'react-redux';
 import { createStore, Store } from 'redux';
-
 // defines -------------------------------------------------------------
 export const MODULE_COMMON = 'reaction_module_common';
 
 export interface KV {
     [k: string]: any
 }
-// tslint:disable-next-line:interface-name
+
 export interface ModuleStore extends KV {
     module: string;
 }
@@ -23,7 +23,10 @@ export interface ModuleAction<PAYLOAD_TYPE = any, MODULE_STORE = ModuleStore, PR
     /** the action's name, by default will be 'moduleAction'*/
     name?: string;
 
-    /** the business logic processor, normally, you can fetch apis, do something composed, etc.
+    /** the max time(by seconds) allowed the process functiion execute, if timeout, the process will be cancel and return a blank {}  */
+    maxProcessSeconds?: number;
+
+    /** the business logic processor, normally, you can fetch apis, do sth complex, etc.
      * when finished your logic, please return the data to modify via k-v like, actually, you can
      * only modify the specific moduleStore's props which you indicates by the 'module' property
      * eg. there's a moduleStore holding the user info: 
@@ -34,7 +37,7 @@ export interface ModuleAction<PAYLOAD_TYPE = any, MODULE_STORE = ModuleStore, PR
      *          process: async (payload: KV, moduleStore: any) => {
      *              const res = await someFetchMethod(payload.username, payload.password);
      *              // when got the user info by server, return infos you wanna modify
-     *              return {username: res.username, level: res.level}
+     *              return { level: res.level}
      *          }
      *      }
      * 
@@ -43,14 +46,6 @@ export interface ModuleAction<PAYLOAD_TYPE = any, MODULE_STORE = ModuleStore, PR
      */
     process?: (payload: PAYLOAD_TYPE, moduleStore: MODULE_STORE) => Promise<PROCEED_RESULT>;
 }
-
-// tslint:disable-next-line:interface-name
-// export interface ModuleActionGeneric<T, K> {
-//     module: string;
-//     name?: string;
-//     process?: (payload: T, moduleStore: ModuleStore) => Promise<K>;
-// }
-
 /// ---------------------------------------------------------------------
 
 // redux wrap------------------------------------------------------------
@@ -63,11 +58,12 @@ const js_meta_types = [
     'symbol',
     'undefined'
 ]
-const _initStore = {};
+const _initStore: KV = {};
 interface ReactionDb {
-store: Store;
-    showLoading: (loadingTag?: string) => void;
-    hideLoading: (loadingTag?: string) => void;
+    store: Store; // the combined store of redux
+    showLoading: (loadingTag?: string) => void; // the showLoading function
+    hideLoading: (loadingTag?: string) => void; // the hideLoading function
+    defaultMaxProcessSeconds: number; // the default max time(by seconds) of one action's process
 }
 const testLoadingFn = tag => console.log(`
 got a loading tag: ${tag}, 
@@ -78,19 +74,21 @@ by set reaction.showLoading/hideLoading property`
 export const reaction: ReactionDb = {
     store: Object.create({}),
     showLoading: testLoadingFn,
-    hideLoading: testLoadingFn
+    hideLoading: testLoadingFn,
+    defaultMaxProcessSeconds: 8 // by default, one action's process function is allow to execute 8s
 };
 
 const reducer = (state: any, act: any) => {
     if (act.module) {
         let copy = { ...state };
-        // 按moduleStore处理
+        // deal with data via module
         const moduleStore = copy[act.module];
         if (moduleStore) {
             copy[act.module] = Object.assign(moduleStore, act.payload);
         } else if (act.payload) {
-            // 非moduleStore的话，兼容原始的全局reducer方式
+            // danger! treat the payload as a global data if there's no module id
             copy = Object.assign(copy, act.payload);
+            console.warn(`you have produced a redux action without the 'module' id, which may cause error!`)
         }
         return copy;
 
@@ -119,8 +117,8 @@ export function doAction<P = KV>(
     payload?: P,
     loadingTag: string | 'none' = 'none'
 ) {
-    let mAction: ModuleAction = typeof moduleAction === 'string' ? 
-    {module: moduleAction} : moduleAction;
+    let mAction: ModuleAction = typeof moduleAction === 'string' ?
+        { module: moduleAction } : moduleAction;
 
     // rules: payload must be a KV type when there's no process function in given moduleAction
     if (!mAction.process && typeof payload in js_meta_types) {
@@ -145,7 +143,7 @@ export function doAction<P = KV>(
                     // call showLoading
                     reaction.showLoading();
                     // set the loadingTag of common module
-                    return {loadingTag};
+                    return { loadingTag };
                 }
             },
             payload: undefined
@@ -194,9 +192,18 @@ async function nextAction() {
         const data = payload; // moduleAction如果不提供process函数，就认为payload无需处理
         let processData;
         if (action.process) {
-            processData = await action.process(payload, moduleState);
+            const maxTime = (action.maxProcessSeconds || reaction.defaultMaxProcessSeconds) * 1000;
+
+            processData = await new Promise(resolve => {
+                const tmHdl = setTimeout(() => {
+                    console.error(`action:[module:${action.module},name:${action.name}] 's process timeout! `);
+                    resolve({}); // return a blank obj
+                }, maxTime);
+                action.process!(payload, moduleState).then(_ => resolve(_)).finally(() => clearTimeout(tmHdl));
+            })
+
         }
-        // 通过redux 的dispatch, 将处理过的数据，合并到moudleState
+        // dispatch a redux's action to merge data
         reaction.store.dispatch({
             type: action.name || 'moduleAction',
             module: action.module,
@@ -214,22 +221,32 @@ async function nextAction() {
 }
 
 /**
- * 组件装饰器，用于给组件类添加模块store-> local props的属性映射
- * 可以对一个组件注入多个模块store, 即： 可以依次mapProp(moduleA, 'a', 'b'); mapProp(moduleB, 'c','d');
- * 注入同一个模块store的属性时，应一次性注入如需的属性，不能分开多次注入。即：mapProp(moduleA, 'a','b') 不能拆成mapProp(moduleA, 'a'); mapProp(moduleA, 'b');
- * @param moduleName 模块名，便于在全局store里标识所属的业务模块
- * @param props 要映射的字段名，eg:'aa','bb',对应于全局store里的[moduleName.aa]\[moduleName.bb],
- * 当props为空的时候,返回module的所有属性: by yaozhao 2019/1/23
- * @argument props传的字符串如果包含冒号，则表示映射时moduleStore中的属性进行重命名，举例如下：
- * eg: 'modulePropA:uiPropB' 相当与对UI组件的props注入： {uiPropB: moduleStore.modulePropA}
+ * the decorator used to inject moduleStore's props to Compnent
+ * you can use this decorator several times to inject different moduleStore's props, eg. mapProp(moduleA, 'a','b') mapProp(moduleB, 'c','d')
+ * while, you can not use it twice or more when inject one same moduleStore. in other words, mapProp(moduleA, 'a','b') mapProp(moduleA, 'c', 'd') will course error, instead, use mapProp(moduleA, 'a','b','c','d') to inject all props you need in one call
+ * 
+ * @param moduleStore the moduleStore or the moduleName you wanna inject from.
+ * here receive two types of para
+ *  1. string, indicates the moduleName, make sure you have called the 'regStore' mannaully before
+ *  2. moduleStore instance, then in this mapProp function, will call 'regStore' automaticly by using the [copy] of the moduleStore given only if moduleStore.module not registered before!!(so one module will not be registered twice or more)
+ * @param props these propNames of the moduleStore you wanna inject, 
+ * here're two syntax sugars:
+ *  1.if you want to inject all the props of the moduleStore, you can bypass the props param(feel free to let this param blank)
+ *  2.you can rename props by use a ':', eg. mapProp(moduleA, 'a','b:bbb'), then in the Component, this.props.bbb refers to the moduleA.b 's value
+ * 
  */
-export function mapProp(moduleStore: ModuleStore, ...props: string[]): Function {
-    const moduleName = moduleStore.module;
-    // reg the moduleStore if it has not
-    if (!_initStore.hasOwnProperty(moduleName)) {
-        // make a copy when call regStore, so you may reset the moduleStore's prop to initial state by
-        // simply doAction({module: 'xxModule'}, xxModuleStore)
-        regStore({...moduleStore}); 
+export function mapProp(module: ModuleStore | string, ...props: string[]): Function {
+    let moduleName: string;
+    if ( typeof module === 'string' ) {
+        moduleName = module;
+    } else {
+        moduleName = module.module;
+        if (!_initStore.hasOwnProperty(moduleName)) {
+            // reg the moduleStore if it has not
+            // make a copy when call regStore, so you may reset the moduleStore's prop to initial state by
+            // simply doAction({module: 'xxModule'}, xxModuleStore)
+            regStore({ ...module });
+        }
     }
     return function (target: any) {
         let mappedFlag: string = target.__mappedMd__ || '';
@@ -239,14 +256,14 @@ export function mapProp(moduleStore: ModuleStore, ...props: string[]): Function 
             mappedFlag += '_' + moduleName;
             target.__mappedMd__ = mappedFlag;
 
-            return connect(state => {
-                let st = {};
+            return connect((state: KV) => {
+                let st: KV = {};
                 if (props.length > 0) {
                     const mdStore = state[moduleName];
                     props.forEach(key => {
                         if (mdStore) {
                             let uiKey, mdKey;
-                                if (key.includes(':')) {
+                            if (key.includes(':')) {
                                 const kv = key.split(':');
                                 uiKey = kv[0];
                                 mdKey = kv[1];
@@ -271,7 +288,6 @@ export function mapProp(moduleStore: ModuleStore, ...props: string[]): Function 
 
 export function regStore(moduleStore: ModuleStore) {
     const mdNm = moduleStore.module;
-    // delete moduleStore.module;
     _initStore[mdNm] = moduleStore;
     Object.assign(reaction.store, createStore(reducer, _initStore));
 }
@@ -301,4 +317,8 @@ export function getModuleProp(moduleName: string, propName: string): any {
     return mdStore ? mdStore[propName] : null;
 }
 
-export const Provider = props => RdProvider({...props, store: reaction.store})
+export class Provider extends React.Component<{},{}>{
+    render() {
+        return <RdProvider store={reaction.store}>{this.props.children}</RdProvider>
+    }
+}

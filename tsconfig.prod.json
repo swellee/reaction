@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules","env", "tmp", "src/dev","lib","scripts", "webpack"]
+}
