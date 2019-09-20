@@ -316,9 +316,8 @@ export function getModuleProp(moduleName: string, propName: string): any {
     const mdStore = getModuleState(moduleName);
     return mdStore ? mdStore[propName] : null;
 }
-
 export class Provider extends React.Component<{},{}>{
     render() {
-        return <RdProvider store={reaction.store}>{this.props.children}</RdProvider>
+        return <RdProvider store={reaction.store} {...this.props}>{this.props.children}</RdProvider>
     }
 }

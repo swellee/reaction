@@ -84,8 +84,9 @@
   },
   "scripts": {
     "start": "node scripts/start.js",
-    "build": "node scripts/build.js",
-    "test": "node scripts/test.js"
+    "build": "tsc src/lib/index.tsx -d --jsx react --esModuleInterop true --outDir ./lib",
+    "test": "node scripts/test.js",
+    "push": "npm version patch --no-git-tag-version & npm publish"
   },
   "eslintConfig": {
     "extends": "react-app"
