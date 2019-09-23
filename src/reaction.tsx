@@ -12,10 +12,6 @@ export interface ModuleStore extends KV {
     module: string;
 }
 
-/**
- * 
- * 如果process里想拿到全局store或其他模块store,可调用：getGlobalState或getModuleState ！！！
- */
 export interface ModuleAction<PAYLOAD_TYPE = any, MODULE_STORE = ModuleStore, PROCEED_RESULT = KV> {
     /** the relative module this action will modify */
     module: string;
@@ -57,7 +53,7 @@ const js_meta_types = [
     'function',
     'symbol',
     'undefined'
-]
+];
 const _initStore: KV = {};
 interface ReactionDb {
     store: Store; // the combined store of redux
@@ -65,7 +61,7 @@ interface ReactionDb {
     hideLoading: (loadingTag?: string) => void; // the hideLoading function
     defaultMaxProcessSeconds: number; // the default max time(by seconds) of one action's process
 }
-const testLoadingFn = tag => console.log(`
+const testLoadingFn = (tag?: string) => console.log(`
 got a loading tag: ${tag}, 
 you'd better implements your own 'showLoading' and 'hideLoading' 
 by set reaction.showLoading/hideLoading property`
@@ -113,7 +109,7 @@ const actionQueue: ActionNode<any>[] = [];
  * @param loading whether call showloading when execute this action
  */
 export function doAction<P = KV>(
-    moduleAction: ModuleAction | string,
+    moduleAction: ModuleAction<any, any, any> | string,
     payload?: P,
     loadingTag: string | 'none' = 'none'
 ) {
@@ -237,15 +233,13 @@ async function nextAction() {
  */
 export function mapProp(module: ModuleStore | string, ...props: string[]): Function {
     let moduleName: string;
-    if ( typeof module === 'string' ) {
+    if (typeof module === 'string') {
         moduleName = module;
     } else {
         moduleName = module.module;
         if (!_initStore.hasOwnProperty(moduleName)) {
             // reg the moduleStore if it has not
-            // make a copy when call regStore, so you may reset the moduleStore's prop to initial state by
-            // simply doAction({module: 'xxModule'}, xxModuleStore)
-            regStore({ ...module });
+            regStore(module);
         }
     }
     return function (target: any) {
@@ -286,19 +280,42 @@ export function mapProp(module: ModuleStore | string, ...props: string[]): Funct
     };
 }
 
+function cloneV(val: any): any {
+    if (Array.isArray(val)) {
+        return val.map(_ => cloneV(_));
+    } else if (typeof val === 'object') {
+        const res: KV = {};
+        for (const k in val) {
+            res[k] = cloneV(val[k])
+        }
+        return res;
+    } else {
+        return val;
+    }
+
+}
+/**
+ * reg a moduleStore to global redux's store mannally
+ * note: when you call this method mannally, it will replace the original data if there's already registed a moduleStore with the same module name
+ * @param moduleStore the moduleStore to reg
+ */
 export function regStore(moduleStore: ModuleStore) {
     const mdNm = moduleStore.module;
-    _initStore[mdNm] = moduleStore;
+    // make a copy when call regStore, so you may reset the moduleStore's prop to initial state by
+    // simply doAction('xxModule', xxModuleStore)
+    _initStore[mdNm] = cloneV(moduleStore);
     Object.assign(reaction.store, createStore(reducer, _initStore));
 }
-
+/**
+ * enable redux_devtools
+ */
 export function enableDevtools() {
     let enhancer;
     const win: KV = window;
     if (win.__REDUX_DEVTOOLS_EXTENSION__) {
         enhancer = win.__REDUX_DEVTOOLS_EXTENSION__();
+        Object.assign(reaction.store, createStore(reducer, _initStore, enhancer));
     }
-    Object.assign(reaction.store, createStore(reducer, _initStore, enhancer));
 }
 
 // return the global store's snapshot state
@@ -316,8 +333,6 @@ export function getModuleProp(moduleName: string, propName: string): any {
     const mdStore = getModuleState(moduleName);
     return mdStore ? mdStore[propName] : null;
 }
-export class Provider extends React.Component<{},{}>{
-    render() {
-        return <RdProvider store={reaction.store} {...this.props}>{this.props.children}</RdProvider>
-    }
-}
+
+// the wrapper of react-redux's Provider
+export const Provider: React.FC = (props: any) => (<RdProvider store={reaction.store} {...props}/>);

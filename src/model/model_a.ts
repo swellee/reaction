@@ -1,4 +1,4 @@
-import { ModuleStore } from "../../lib";
+import { ModuleStore } from "../reaction";
 import { MODULE_A } from "./consts";
 
 export const mStoreA: ModuleStore = {
