@@ -19,18 +19,17 @@ import { freshUserMsgAction } from '../model/action_b';
 */
 @mapProp(MODULE_B, 'lists')
 export class PageB extends React.Component<KV, {}> {
-    private _hdl: any;
-    componentDidMount() {
-        this._hdl = setInterval(()=> {
-            doAction(freshUserMsgAction)
-        })
+    constructor(props: KV) {
+        super(props);
+        this.state = {};
     }
-    componentWillUnmount() {
-        if (this._hdl) {
-            clearInterval(this._hdl);
-            this._hdl = undefined;
-        }
+    static getDerivedStateFromProps(props: KV, state: {}) {
+        // fetch new msg when update
+        doAction(freshUserMsgAction);
+
+        return state;
     }
+
     render() {
         return (
             <div className="page-b">

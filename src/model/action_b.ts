@@ -7,27 +7,24 @@ export const freshUserMsgAction: ModuleAction<KV, IModuleB> = {
 
     process: async (payload: KV, moduleState: IModuleB) => {
         const msg = await fetchNewMsg();
-        if (msg) {
-            const lists = moduleState.lists;
-            lists.push(msg);
-            return { lists }
-        }
-        return {}
+        const lists = moduleState.lists;
+        lists.push(msg);
+        return { lists }
     }
 }
 
 const randomMsgs = 'asdkwoeiruwokxvmaskrowiusmvnasdkrowierksjvaiwerowoeir';
 // mock function of fetch a new msg
-function fetchNewMsg(): Promise< IUserMsg | undefined> {
+function fetchNewMsg(): Promise<IUserMsg> {
     return new Promise(resolve => {
         const delay = (Math.random() * 6000) >> 0;
         setTimeout(() => {
-            return Math.random() > 0.5 ?
-                undefined : {
-                    username: String.fromCharCode((Math.random() * 32) >> 0 + 67),
+            const msg = {
+                    username: String.fromCharCode(67 + (Math.random() * 32) >> 0),
                     msg: randomMsgs.substr((Math.random() * 10) >> 0, (Math.random() * randomMsgs.length) >> 0),
                     time: Date.now()
                 };
+            resolve(msg);
         }, delay);
     })
 }
