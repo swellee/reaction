@@ -278,18 +278,29 @@ export function mapProp(module: ModuleStore | string, ...props: string[]): Funct
 
     };
 }
-
+function getType(obj: any) {
+    var type = Object.prototype.toString.call(obj).match(/^\[object (.*)\]$/)![1].toLowerCase();
+    if (obj === null) return 'null'; // PhantomJS has type "DOMWindow" for null
+    if (obj === undefined) return 'undefined'; // PhantomJS has type "DOMWindow" for undefined
+    return type;
+}
 function cloneV(val: any): any {
-    if (Array.isArray(val)) {
-        return val.map(_ => cloneV(_));
-    } else if (typeof val === 'object') {
-        const res: KV = {};
-        for (const k in val) {
-            res[k] = cloneV(val[k])
-        }
-        return res;
-    } else {
-        return val;
+    const type = getType(val);
+    switch (type) {
+        case 'array':
+            return val.map(_ => cloneV(_));
+        case 'map':
+            return new Map(val);
+        case 'set':
+            return new Set(val);
+        case 'object':
+            const res: KV = {};
+            for (const k in val) {
+                res[k] = cloneV(val[k])
+            }
+            return res;
+        default:
+            return val;
     }
 
 }
@@ -335,4 +346,4 @@ export function getModuleProp(moduleName: string, propName: string, useClone = t
     return mdStore ? mdStore[propName] : null;
 }
 // the wrapper of react-redux's Provider
-export const Provider: React.FC = (props: any) => (<RdProvider store={reaction.store} {...props}/>);
+export const Provider: React.FC = (props: any) => (<RdProvider store={reaction.store} {...props} />);
