@@ -9,6 +9,10 @@ export const freshUserMsgAction: ModuleAction<KV, IModuleB> = {
         const msg = await fetchNewMsg();
         const lists = moduleState.lists;
         lists.push(msg);
+        // by default, the param moduleState is a clone of the moduleStore
+        // so directly modify won't cause any change in redux
+        // you need to return a obj contains sth wanna be modify, in this example, we
+        // only wanna modify the 'lists', then return {lists} 
         return { lists }
     }
 }

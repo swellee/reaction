@@ -22,12 +22,11 @@ export class PageB extends React.Component<KV, {}> {
     constructor(props: KV) {
         super(props);
         this.state = {};
-    }
-    static getDerivedStateFromProps(props: KV, state: {}) {
-        // fetch new msg when update
         doAction(freshUserMsgAction);
+    }
 
-        return state;
+    componentDidUpdate() {
+        doAction(freshUserMsgAction);
     }
 
     render() {

@@ -182,8 +182,7 @@ async function nextAction() {
         return;
     }
     const { action, payload } = actionQueue[0];
-    const globalState = reaction.store.getState();
-    const moduleState = globalState[action.module];
+    const moduleState = getModuleState(action.module);
     try {
         const data = payload; // moduleAction如果不提供process函数，就认为payload无需处理
         let processData;
@@ -318,21 +317,22 @@ export function enableDevtools() {
     }
 }
 
-// return the global store's snapshot state
-export function getGlobalState() {
-    return reaction.store.getState();
+// return the global store's snapshot state, return the clone by default
+// so by default, don not modify the return data directly!!!
+export function getGlobalState(useClone = true) {
+    const st = reaction.store.getState();
+    return useClone ? cloneV(st) : st;
 }
 
 // return the specific moduleStore's snapshot state
-export function getModuleState<T>(moduleName: string): T | any {
-    return getGlobalState()[moduleName] as T;
+export function getModuleState<T>(moduleName: string, useClone = true): T | any {
+    return getGlobalState(useClone)[moduleName] as T;
 }
 
 // return the specific moduleStore's prop by name
-export function getModuleProp(moduleName: string, propName: string): any {
-    const mdStore = getModuleState(moduleName);
+export function getModuleProp(moduleName: string, propName: string, useClone = true): any {
+    const mdStore = getModuleState(moduleName, useClone);
     return mdStore ? mdStore[propName] : null;
 }
-
 // the wrapper of react-redux's Provider
 export const Provider: React.FC = (props: any) => (<RdProvider store={reaction.store} {...props}/>);
