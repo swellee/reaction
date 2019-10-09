@@ -1,6 +1,6 @@
 {
-  "name": "reaction",
-  "version": "0.1.0",
+  "name": "module-reaction",
+  "version": "0.1.5",
   "main": "lib/reaction.js",
   "typings": "lib/reaction.d.ts",
   "scripts": {

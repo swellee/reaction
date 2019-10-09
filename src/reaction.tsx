@@ -113,6 +113,43 @@ export function doAction<P = KV>(
     payload?: P,
     loadingTag: string | 'none' = 'none'
 ) {
+    if (inQueue<any>(actionQueue, moduleAction, payload, loadingTag)) {
+        nextAction();
+    }
+}
+
+export function doFunction(fn: () => Promise<any>, payload?: KV) {
+    const action = {
+        module: 'none',
+        process: fn
+    };
+    doAction(action, payload);
+}
+
+/**
+ * insert an action at the certain pos closely after the current
+ * action's process be finished
+ * @access this method can only be called inside a action's process!!
+*/
+export function plusAction<P = KV>(
+    moduleAction: ModuleAction<any, any, any> | string,
+    payload?: P,
+    loadingTag: string | 'none' = 'none'
+) {
+    const { action } = actionQueue[0] as any;
+    if (!action.__processing__) {
+        throw new Error(`you are only allowed to call plusAction inside an action's process !!`);
+    }
+    const plusActions: ActionNode<P>[] = action.__plus_actions = action.__plus_actions || [];
+    inQueue(plusActions, moduleAction, payload, loadingTag);
+}
+
+function inQueue<P = KV>(
+    queue: ActionNode<P>[],
+    moduleAction: ModuleAction<any, any, any> | string,
+    payload?: P,
+    loadingTag: string | 'none' = 'none'
+) {
     let mAction: ModuleAction = typeof moduleAction === 'string' ?
         { module: moduleAction } : moduleAction;
 
@@ -131,7 +168,7 @@ export function doAction<P = KV>(
     const useLoading = loadingTag !== 'none';
     if (useLoading) {
         // insert showloading
-        actionQueue.push({
+        queue.push({
             action: {
                 name: `@@begin loading:${mAction.name}`,
                 module: MODULE_COMMON,
@@ -142,13 +179,13 @@ export function doAction<P = KV>(
                     return { loadingTag };
                 }
             },
-            payload: undefined
+            payload: undefined as any
         });
     }
-    actionQueue.push({ action: mAction, payload });
+    queue.push({ action: mAction, payload: payload as any });
     if (useLoading) {
         // insert hideloading
-        actionQueue.push({
+        queue.push({
             action: {
                 name: `@@end loading:${mAction.name}`,
                 module: MODULE_COMMON,
@@ -159,22 +196,12 @@ export function doAction<P = KV>(
                     return { loadingTag: 'none' };
                 }
             },
-            payload: undefined
+            payload: undefined as any
         });
         canStartAction = 3;
     }
 
-    if (actionQueue.length === canStartAction) {
-        nextAction();
-    }
-}
-
-export function doFunction(fn: () => Promise<any>, payload?: KV) {
-    const action = {
-        module: 'none',
-        process: fn
-    };
-    doAction(action, payload);
+    return queue.length === canStartAction
 }
 
 async function nextAction() {
@@ -194,7 +221,9 @@ async function nextAction() {
                     console.error(`action:[module:${action.module},name:${action.name}] 's process timeout! `);
                     resolve({}); // return a blank obj
                 }, maxTime);
+                (action as any).__processing__ = true;
                 action.process!(payload, moduleState).then(_ => resolve(_)).finally(() => clearTimeout(tmHdl));
+                delete (action as any).__processing__;
             })
 
         }
@@ -209,6 +238,12 @@ async function nextAction() {
     }
 
     actionQueue.shift();
+
+    if (action.hasOwnProperty('__plus_actions')) {
+        const childActions: ActionNode[] = (action as any).__plus_actions;
+        actionQueue.unshift(...childActions);
+        delete (action as any).__plus_actions;
+    }
 
     if (actionQueue.length > 0) {
         nextAction();
@@ -334,12 +369,10 @@ export function getGlobalState(useClone = true) {
     const st = reaction.store.getState();
     return useClone ? cloneV(st) : st;
 }
-
 // return the specific moduleStore's snapshot state
 export function getModuleState<T>(moduleName: string, useClone = true): T | any {
     return getGlobalState(useClone)[moduleName] as T;
 }
-
 // return the specific moduleStore's prop by name
 export function getModuleProp(moduleName: string, propName: string, useClone = true): any {
     const mdStore = getModuleState(moduleName, useClone);
