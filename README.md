@@ -9,8 +9,25 @@ modulized redux store management framework, based on react-redux
   - simple apis
 
 ## useage
-  - first of all, declare a [moduleStore](###ModuleStore)
-  - then, optionally, you can call [regStore](##apis) manually or not
+  - first of all, import the ```Provider```from 'module-reaction', and use it as the wrapper of you root Component, like this:
+    + ```typescript
+      import { Provider } from 'module-reaction';
+
+      ReactDOM.render(<Provider><App /></Provider>, document.getElementById('root'));
+
+  - go focus on your business, , declare some [moduleStore](###ModuleStore) to store your business-module's data, like this:
+    + ```typescript
+      export const mStoreA: ModuleStore = {
+        module: MODULE_A, // MODULE_A is a const string declared somewhere
+        size: '2*2',
+        count: 10,
+        price: 9.9,
+        infos: {
+            madeIn: 'China',
+            saleTo: 'anywhere'
+        }
+      }
+  - optionally, you can call [regStore](##apis) manually or not
   - then, inject moduleStore's props into React.Component class by adding a decorator [mapProp](#apis) before the component-class's declaration. PS: when you use the [mapProp](#apis) decorator, the metioned moduleStore will be reg automaticly if it has not been registered.
   and if you are using ES5, you can call ```mapProp(moduleStore, ...props)(YourComponentClass)``` instead
   - during the runtime, please call [doAction](#apis) if you want to change the relative moduleStore's some props
