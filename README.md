@@ -1,4 +1,4 @@
-# reaction
+# module-reaction
 modulized redux store management framework, based on react-redux
 
 ## features

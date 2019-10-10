@@ -1,8 +1,20 @@
 {
   "name": "module-reaction",
-  "version": "0.1.5",
+  "version": "0.1.8",
   "main": "lib/reaction.js",
   "typings": "lib/reaction.d.ts",
+  "files": [
+    "lib/reaction.js",
+    "lib/reaction.d.ts"
+  ],
+  "keywords": [
+    "react",
+    "redux",
+    "react-redux",
+    "reaction",
+    "module",
+    "modulize"
+  ],
   "scripts": {
     "start": "react-scripts start",
     "build": "tsc src/reaction.tsx -d --jsx react --esModuleInterop true --outDir ./lib",
