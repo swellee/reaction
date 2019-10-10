@@ -51,5 +51,8 @@ modulized redux store management framework, based on react-redux
         maxProcessSeconds?: number;
         process?: (payload: PAYLOAD_TYPE, moduleStore: MODULE_STORE) => Promise<PROCEED_RESULT>;
       }
-      
+## tips
+  - there're much more comments in the source code [file](https://github.com/swellee/reaction/blob/master/src/reaction.tsx)
+  - there're several means of usage examples in the source code [project](https://github.com/swellee/reaction)
+  - also, there's a flutter-implements project [here](https://github.com/swellee/flutter_reaction)
   
