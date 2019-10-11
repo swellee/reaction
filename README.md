@@ -17,8 +17,9 @@ modulized redux store management framework, based on react-redux
 
   - go focus on your business, , declare some [moduleStore](###ModuleStore) to store your business-module's data, like this:
     + ```typescript
+      export const MODULE_A = 'module_a';
       export const mStoreA: ModuleStore = {
-        module: MODULE_A, // MODULE_A is a const string declared somewhere
+        module: MODULE_A,
         size: '2*2',
         count: 10,
         price: 9.9,
@@ -29,8 +30,51 @@ modulized redux store management framework, based on react-redux
       }
   - optionally, you can call [regStore](##apis) manually or not
   - then, inject moduleStore's props into React.Component class by adding a decorator [mapProp](#apis) before the component-class's declaration. PS: when you use the [mapProp](#apis) decorator, the metioned moduleStore will be reg automaticly if it has not been registered.
-  and if you are using ES5, you can call ```mapProp(moduleStore, ...props)(YourComponentClass)``` instead
-  - during the runtime, please call [doAction](#apis) if you want to change the relative moduleStore's some props
+  and if you are using ES5, you can call ```mapProp(moduleStore, ...props)(YourComponentClass)``` instead, here is an example:
+    + ```typescript
+      @mapProp(mStoreA, 'size', 'price', 'count', 'infos')
+      export class PageA extends React.Component<KV, {}> {
+        render() {
+          return (
+            <div>
+            {this.props.size},
+            {this.props.price * this.props.count},
+            {this.props.infos.madeIn}
+            </div>
+          )
+        }
+    + and if you have called 'regStore' manually in other place:
+    + ```typescript
+      regStore(mStoreA);
+    + then you can give the moduleName insdead of the moduleStore when use the 'mapProp' decorator, like this:
+    + ```typescript
+      @mapProp(MODULE_A, 'size', 'price', 'count', 'infos')
+      export class PageA extends React.Component<KV, {}> {
+        ...
+      }
+  - during the runtime, please call [doAction](#apis) if you want to change the relative moduleStore's some props. for example, when click a button, change the 'count'. usually, you need to declare a moduleAction to do this, here we go:
+    + ```typescript
+      export const increaseCountAction: MoudleAction = {
+        module: MODULE_A,
+        process: async (payload: KV, moduleState: ModuleStore) => {
+          let count = moduleState.count;
+          count++;
+          return {count};
+        }
+      }
+    + ```typescript
+      ...
+      <button onClick={this.increaseCnt}></button>
+      ...
+      ...
+      private increaseCnt = e => {
+        doAction(increaseCountAction);
+      }
+    + you may have noticed that the 'increaseCountAction' process is very simple, it just return a KV which contains the props to be modified~ 
+    exactly, there's a sugar for these simple situation, if you won't do sth complicated in one moduleAction's process function, you are recommend to call the doAction method directly like this:
+    + ```typescript
+      doAction(MODULE_A, {count: this.props.count+1});
+    + in other words, if you pass a moduleName and a KV payload to the doAction method, the framework will merge the payload to the moduleStore of the specific moduleName. in fact, you only need to declare a moduleAction when you have to do sth complicate or fetch server datas, .etc
   - please see the completed example via the repository of this project https://github.com/swellee/reaction
 
 ## apis
