@@ -1,6 +1,14 @@
 # module-reaction
 modulized redux store management framework, based on react-redux
 
+## install
+  - via npm
+    ```shell
+      npm install module-reaction
+  - via yarn
+    ```shell
+      yarn add module-reaction
+
 ## features
   - modulized state/store management
   - inject module-state's props to components easily(no more 'connect' call)
