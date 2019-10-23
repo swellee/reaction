@@ -13,7 +13,7 @@ modulized redux store management framework, based on react-redux
   - modulized state/store management
   - inject module-state's props to components easily(no more 'connect' call)
   - native async action process
-  - merged redux's action and reducer to make things atomization
+  - integrate redux's action and reducer to make things atomization
   - simple apis
 
 ## useage
@@ -39,7 +39,8 @@ modulized redux store management framework, based on react-redux
       }
   - optionally, you can call [regStore](##apis) manually or not
   - then, inject moduleStore's props into React.Component class by adding a decorator [mapProp](#apis) before the component-class's declaration. PS: when you use the [mapProp](#apis) decorator, the mentioned moduleStore will be reg automatically if it has not been registered.
-  and if you are using ES5, you can call ```mapProp(moduleStore, ...props)(YourComponentClass)``` instead, here is an example:
+  and if you are using ES5, you can call ```mapProp(moduleStore, ...props)(YourComponentClass)``` just like the react-redux's `connect`method.
+  codes below will inject mStoreA's ['size', 'price', 'count', 'infos'] prop to the Component `PageA`:
     + ```typescript
       @mapProp(mStoreA, 'size', 'price', 'count', 'infos')
       export class PageA extends React.Component<KV, {}> {
@@ -76,7 +77,8 @@ modulized redux store management framework, based on react-redux
         ...
       }
     + and have you noticed that there's a ```sth:sth2``` above? sometimes, the prop's name of different moduleStore maybe the same, eg: both mStoreB and mStoreC has a prop named 'sth', when injected those two into one Component, you can use a ```:``` gamar to rename the injected prop. so, the above code will inject a 'sth2' prop to PageA and refers to 'mStoreC.sth'
-  - during the runtime, please call [doAction](#apis) if you want to change the relative moduleStore's some props. for example, when click a button, change the 'count'. usually, you need to declare a moduleAction to do this, here we go:
+  - during the runtime, please call [doAction](#apis) if you want to change the relative moduleStore's some props. for example, when click a button, change the 'count'. usually, you need to declare a moduleAction to do this, a moduleAction represents an integrated opreation to make changes to its relative moduleStore.
+  here we go:
     + ```typescript
       export const increaseCountAction: MoudleAction = {
         module: MODULE_A,
@@ -106,17 +108,38 @@ modulized redux store management framework, based on react-redux
   moduleStore will be replaced by the last one you given.
   given the fact that the ```mapProp``` can automatically register a moduleStore only once, you are not recommend to call this method manually!
   - ```mapProp``` this is a ES6+ (or typescript) decorator, you can use this to inject moduleStore's props to a Component by adding the decorator before the component-class's declaration. this method will register the given moduleStore automatically if it has not been registered.
+    + in `mapProp`, it also called `regStore` to register moduleStore
+    + in `regStore` it will register the ***clone*** of given moduleStore, not the original one, so if you want to reset the MODULE_A to the initial state, just call:
+    `doAction(MODULE_A, mStoreA)`;
   - ```doAction``` you need call this method if you want to modify some props of the specific moduleStore.
   - ```plusAction``` this method is allowed only inside an moduleAction's process function, and used to insert another moduleAction closely after the current action's process finished.
-  - ```doFunction``` a sugar to call some method after the current action queue. \* pls notice: actions will be executed one by one in queue. so if you code: 
+  - ```doFunction``` a sugar to call some method after the current action queue. \* pls notice: actions will be executed one by one in queue
+    + ***Notice*** : all actions will be execute in queue(other words : one by one)!
+    imagine that: you have declared `actionA, actionB, actionC, functionD, actionE, actionF`, and in actionB's process, you called `plusAction` like this:
+    + ```typescript
+        actionB: ModuleAction = {
+        module: MODULE_B,
+        process: async () => {
+            ...
+            plusAction(actionE)
+            plusAction(actionF)
+            ...
+            // remember, each moduleAction's process need to return a KV obj
+            return {someThing: 'someValue'}
+        }
+      }
+    and in your business code:
     + ```typescript
       doAction(actionA);
       doAction(actionB);
       doAction(actionC);
       doFunction(functionD);
-    + the functionD will execute when the actionC's process finished!
+    then the execute order is:`actionA->actionB->actionE->actionF->actionC->functionD`
+    - and in `actionC`'s process function, you can get the latest data which is modified by `actionF` if you want.
+
   - ```Provider``` the Provider wrapped with react-redux's Provider
-  - ```reaction``` a const object holding some default config
+  - ```reaction``` a const object holding some default config,
+  like `showLoading,hideLoading,defaultMaxProcessSeconds`
   - ```getGlobalState``` return the snapshot of the current redux' store
   - ```getModuleState``` return the snapshot of the current redux-store's some module
   - ```getModuleProp``` return the snapshot of the current redux-store's some module's some prop
@@ -133,7 +156,7 @@ modulized redux store management framework, based on react-redux
       interface ModuleStore extends KV {
         module: string;
       }
-  - ```ModuleAction``` an action is a processor to deal with some datas an make the changes to the specific module.
+  - ```ModuleAction``` an action is a processor to deal with some datas and make the changes to the specific module.
     + ```typescript
       interface ModuleAction<PAYLOAD_TYPE = any, MODULE_STORE = ModuleStore, PROCEED_RESULT = KV> {
         module: string;
@@ -141,8 +164,14 @@ modulized redux store management framework, based on react-redux
         maxProcessSeconds?: number;
         process?: (payload: PAYLOAD_TYPE, moduleStore: MODULE_STORE) => Promise<PROCEED_RESULT>;
       }
+    ***
+    there's a `name` prop in ModuleAction, this prop helps you find the action easily in ReduxDevtools during development;
+    ***
+    and the `maxProcessSeconds` prop tell the framework that allow this action's process to run not more than the given time(unit by seconds), once out of time, the framework will abondon its process result,and go to execute next moduleAction. the default value is `8`s hold by `reaction.defaultMaxProcessSeconds`
 ## tips
   - there're much more comments in the source code [file](https://github.com/swellee/reaction/blob/master/src/reaction.tsx)
   - there're several means of usage examples in the source code [project](https://github.com/swellee/reaction)
   - also, there's a flutter-implements project [here](https://github.com/swellee/flutter_reaction)
-  
+## todo plan
+  - provide a plugin system
+  - provide a plugin to manage undo/redo
