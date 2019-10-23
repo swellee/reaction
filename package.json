@@ -1,12 +1,13 @@
 {
   "name": "module-reaction",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "main": "lib/reaction.js",
   "typings": "lib/reaction.d.ts",
   "files": [
     "lib/reaction.js",
     "lib/reaction.d.ts"
   ],
+  "license": "MIT",
   "keywords": [
     "react",
     "redux",
