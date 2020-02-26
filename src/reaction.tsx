@@ -222,8 +222,10 @@ async function nextAction() {
                     resolve({}); // return a blank obj
                 }, maxTime);
                 (action as any).__processing__ = true;
-                action.process!(payload, moduleState).then(_ => resolve(_)).finally(() => clearTimeout(tmHdl));
-                delete (action as any).__processing__;
+                action.process!(payload, moduleState).then(_ => resolve(_)).finally(() => {
+                    clearTimeout(tmHdl);
+                    delete (action as any).__processing__;
+                });
             })
 
         }
