@@ -295,8 +295,8 @@ export function mapProp(module: ModuleStore | string, ...props: string[]): Funct
                             let uiKey, mdKey;
                             if (key.includes(':')) {
                                 const kv = key.split(':');
-                                uiKey = kv[0];
-                                mdKey = kv[1];
+                                mdKey = kv[0];
+                                uiKey = kv[1];
                             } else {
                                 uiKey = mdKey = key;
                             }
